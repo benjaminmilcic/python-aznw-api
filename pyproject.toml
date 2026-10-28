@@ -1,0 +1,29 @@
+[project]
+name = "python-aznw-api"
+version = "0.1.0"
+description = "LLM service for the AI chat on benjamin-milcic.dev: streaming chat with tool calling via LiteLLM"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "litellm>=1.60",
+    "httpx>=0.28",
+    "python-dotenv>=1.0",
+    # LiteLLM imports it when tools are passed (litellm_proxy_mcp_handler), but does not declare it
+    "mcp>=2.3.0",
+    "pyyaml>=6.0.3",
+    "pypdf>=6.21.2",
+    "python-multipart>=0.0.32",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "respx>=0.22",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

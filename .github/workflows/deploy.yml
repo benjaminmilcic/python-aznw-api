@@ -1,0 +1,88 @@
+name: Test and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Host and SSH key come from repository secrets – this repository is public.
+#   DEPLOY_HOST       server address (IP or name – the host key below must belong to it)
+#   DEPLOY_HOST_KEY   public host key of the server, e.g. "ssh-ed25519 AAAA..." (verify it once, then store it)
+#   DEPLOY_SSH_KEY    private key of the deploy user
+# The deploy user is not a secret: GitHub would mask every occurrence of such a short word in the logs.
+env:
+  DEPLOY_USER: deploy
+  TARGET_DIR: /opt/python-aznw-api
+  SERVICE: python-aznw-api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run pytest
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    concurrency: deploy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "$DEPLOY_HOST $DEPLOY_HOST_KEY" > ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << EOF
+          Host server
+            HostName $DEPLOY_HOST
+            User $DEPLOY_USER
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking yes
+          EOF
+
+      - name: Check server setup
+        run: |
+          ssh server 'test -x /usr/local/bin/uv || { echo "uv is missing on the server – see README, one-time setup"; exit 1; }'
+
+      # No -a/-p/-g/--chmod: rsync must not set modes itself, otherwise the setgid bit of the target directory is
+      # lost and new files no longer belong to the service group. .venv and the uv Python live on the server only.
+      - name: Copy code
+        run: |
+          # /health reports this, so the health check can prove that the new commit is running
+          echo "$GITHUB_SHA" > BUILD_SHA
+          rsync -rltz --delete \
+            --exclude .git --exclude .github --exclude .venv --exclude .uv-python --exclude .state --exclude .env --exclude tests \
+            ./ server:${TARGET_DIR}/
+
+      # The uv-managed Python goes into the project directory: .venv/bin/python is a symlink to it, and the service
+      # runs with ProtectHome=true – a target under /home/deploy could not be resolved at runtime.
+      - name: Install dependencies
+        run: |
+          ssh server "set -e; cd ${TARGET_DIR}; \
+            UV_PYTHON_INSTALL_DIR=${TARGET_DIR}/.uv-python UV_PYTHON_PREFERENCE=only-managed \
+            /usr/local/bin/uv sync --frozen --no-dev"
+
+      - name: Restart service
+        run: |
+          ssh server "set -e; sudo -n systemctl reset-failed ${SERVICE}; sudo -n systemctl restart ${SERVICE}"
+
+      # is-active is not enough: an import error – or the service user pyapi not being able to read its code – only
+      # shows up when the app starts. Green only once the pushed commit answers.
+      - name: Health check
+        run: |
+          for i in $(seq 1 20); do
+            if ssh server "curl -fsS http://127.0.0.1:8000/health" | grep -q "\"build\":\"$GITHUB_SHA\""; then
+              echo "Commit $GITHUB_SHA is running"; exit 0
+            fi
+            sleep 3
+          done
+          ssh server "sudo -n systemctl status ${SERVICE}" || true
+          exit 1

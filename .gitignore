@@ -1,0 +1,15 @@
+# Secrets – never commit, the repository is public
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Editors
+.vscode/
+.idea/
+.uv-python/
+BUILD_SHA
+.state/

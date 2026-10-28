@@ -1,0 +1,67 @@
+# systemd unit for the server. Install once:
+#   sudo cp deploy/python-aznw-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now python-aznw-api
+# Secrets are NOT here but in the EnvironmentFile (root:root, mode 600), outside the deploy directory.
+
+[Unit]
+Description=python-aznw-api (LLM service for the AI chat)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=pyapi
+Group=pyapi
+WorkingDirectory=/opt/python-aznw-api
+EnvironmentFile=/etc/python-aznw-api/api.env
+# NestJS on the same server – internal address, not through Cloudflare
+Environment=NEST_API_URL=http://127.0.0.1:3000
+# LiteLLM would otherwise download its model price list on every start
+Environment=LITELLM_LOCAL_MODEL_COST_MAP=True
+# Knowledge base: the repository of the website on GitHub, checked for changes every 15 minutes
+Environment=KNOWLEDGE_SOURCE=github:benjaminmilcic/aznw-routes@new
+# Embedding cache in /var/lib/python-aznw-api (STATE_DIRECTORY) – survives restarts, so only new chunks are embedded
+StateDirectory=python-aznw-api
+StateDirectoryMode=0750
+# The service user has no home – other caches go to the private /tmp
+Environment=HOME=/tmp
+ExecStart=/opt/python-aznw-api/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+SyslogIdentifier=python-aznw-api
+
+# Measured peaks of the other services: 100–130 MB; LiteLLM alone needs 150–250 MB. Check after a while with
+#   systemctl show python-aznw-api -p MemoryPeak
+MemoryMax=768M
+TasksMax=256
+UMask=0027
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RemoveIPC=true
+ProtectProc=invisible
+# Port 8000 needs no capability
+CapabilityBoundingSet=
+AmbientCapabilities=
+# Not set on purpose: MemoryDenyWriteExecute breaks ctypes and JIT paths in C extensions
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target
