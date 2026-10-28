@@ -11,6 +11,7 @@ Endpoints (all but /health require the header x-internal-api-key when INTERNAL_A
 import asyncio
 import hmac
 import logging
+import warnings
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
@@ -25,6 +26,9 @@ from app.rag.index import knowledge
 from app.tools import TOOLS
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+# LiteLLM answers GPT-5 models via OpenAI's Responses API and hands Pydantic a plain dict as "usage" – harmless, but
+# it would log this warning with every answer
+warnings.filterwarnings("ignore", message="Pydantic serializer warnings", category=UserWarning)
 
 # Commit of the deployed code, written by the deploy workflow ("local" in development)
 _build_file = Path(__file__).resolve().parent.parent / "BUILD_SHA"
