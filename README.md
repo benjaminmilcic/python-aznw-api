@@ -200,14 +200,15 @@ sudo visudo -c -f /etc/sudoers.d/93-deploy-python   # unbedingt prüfen: eine ka
 Inhalt von `/etc/sudoers.d/93-deploy-python`:
 
 ```
-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart python-aznw-api, \
-                            /usr/bin/systemctl status python-aznw-api, \
-                            /usr/bin/systemctl is-active python-aznw-api, \
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl start python-aznw-api, \
+                            /usr/bin/systemctl stop python-aznw-api, \
+                            /usr/bin/systemctl restart python-aznw-api, \
                             /usr/bin/systemctl reset-failed python-aznw-api
 ```
 
 sudo vergleicht die komplette Kommandozeile – der Workflow ruft die Befehle deshalb genau so auf, ohne
 `.service`-Endung und ohne `|| true` (eine fehlende Regel soll auffallen, nicht verschluckt werden).
+`systemctl status` und `is-active` brauchen kein sudo, der Workflow ruft sie ohne auf.
 
 Nach dem **ersten** Deploy (Code liegt in `/opt/python-aznw-api`) den Dienst einrichten:
 

@@ -84,5 +84,6 @@ jobs:
             fi
             sleep 3
           done
-          ssh server "sudo -n systemctl status ${SERVICE}" || true
+          # Reading the status needs no sudo – and the deploy user's sudoers does not allow it
+          ssh server "systemctl status --no-pager ${SERVICE}" || true
           exit 1
