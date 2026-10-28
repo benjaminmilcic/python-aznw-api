@@ -7,6 +7,7 @@ midnight UTC. Protects against visitors who get around the per-IP limits of Nest
 
 import json
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -58,7 +59,15 @@ class DailyBudget:
             # Write and rename, so a crash never leaves a half-written file
             tmp = self.path.with_suffix(".tmp")
             tmp.write_text(json.dumps({"day": self._day, "spentUsd": round(self._spent, 6)}))
-            tmp.replace(self.path)
+            for attempt in range(5):
+                try:
+                    tmp.replace(self.path)
+                    break
+                except PermissionError:
+                    # Windows (local development): a virus scanner briefly locks the file just written
+                    if attempt == 4:
+                        raise
+                    time.sleep(0.05)
         except OSError as err:  # the count still works in memory
             log.warning("Could not save the daily budget: %s", err)
 

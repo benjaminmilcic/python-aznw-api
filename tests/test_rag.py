@@ -113,3 +113,28 @@ def test_language_fallback_is_the_website_language():
     assert "answer in German" in language_reminder("de")
     assert "answer in Croatian" in language_reminder("hr")
     assert "no recognizable language" not in language_reminder(None)
+
+
+async def test_files_without_any_page_are_reported_instead_of_a_silent_empty_index():
+    import pytest
+
+    from app.rag.index import KnowledgeIndex
+
+    class OldBranch:
+        """Like branch new before the knowledge base: files, but none with frontmatter"""
+
+        def describe(self):
+            return "github:test@old"
+
+        async def list_files(self):
+            return {"ai-chat-knowledge-base/about.md": "v1"}
+
+        async def read(self, path):
+            return b"# no frontmatter"
+
+    index = KnowledgeIndex("../aznw-routes")
+    index.source = OldBranch()
+    with pytest.raises(ValueError, match="no page"):
+        await index.refresh()
+    # Not stored, so the next check reads the files again
+    assert index.versions == {}

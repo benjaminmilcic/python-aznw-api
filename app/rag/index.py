@@ -82,6 +82,10 @@ class KnowledgeIndex:
         contents = await asyncio.gather(*(self.source.read(p) for p in changed))
         files = {p: c for p, c in self.files.items() if p in versions} | dict(zip(changed, contents))
         pages, chunks = load_documents(files)
+        if files and not pages:
+            # Shown as knowledgeError in /health instead of a silent "0 pages" – e.g. the branch doesn't have the
+            # knowledge base (yet). The versions are not stored, so the next check tries again.
+            raise ValueError(f"{len(files)} files found, but no page with frontmatter in {self.source.describe()}")
 
         missing = [c for c in chunks if c.key not in self.cache]
         if missing:
