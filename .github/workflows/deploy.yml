@@ -70,9 +70,13 @@ jobs:
             UV_PYTHON_INSTALL_DIR=${TARGET_DIR}/.uv-python UV_PYTHON_PREFERENCE=only-managed \
             /usr/local/bin/uv sync --frozen --no-dev"
 
+      # reset-failed only when there is something to reset: on a unit that is not loaded (never started) it fails.
+      # Not "|| true" – a refused sudo must still fail the step.
       - name: Restart service
         run: |
-          ssh server "set -e; sudo -n systemctl reset-failed ${SERVICE}; sudo -n systemctl restart ${SERVICE}"
+          ssh server "set -e; \
+            if systemctl is-failed --quiet ${SERVICE}; then sudo -n systemctl reset-failed ${SERVICE}; fi; \
+            sudo -n systemctl restart ${SERVICE}"
 
       # is-active is not enough: an import error – or the service user pyapi not being able to read its code – only
       # shows up when the app starts. Green only once the pushed commit answers.
