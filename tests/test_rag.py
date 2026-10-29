@@ -149,3 +149,18 @@ def test_link_buttons_without_an_image_are_in_the_project_chunk():
     chunk = portfolio_chunks(projects, {"p": {"desc": "Solar app", "webApp": "Open web app"}})[0]
     assert "Open web app: https://app.solakon.de/" in chunk.text
     assert chunk.route == "/?project=solakon#portfolio"
+
+
+def test_photo_from_the_knowledge_keeps_its_path(monkeypatch):
+    from app import chat
+    from app.rag.documents import Chunk
+
+    monkeypatch.setattr(chat.knowledge, "pages", [])
+    monkeypatch.setattr(chat.knowledge, "chunks", [Chunk("Photo: /assets/benjamin_milcic_photo.jpg", "About", "/#about")])
+    monkeypatch.setattr(chat.knowledge, "files", {})
+    fixer = LinkFixer(chat.site_routes())
+    text = fixer.feed("![Benjamin](/assets/benjamin_milcic_photo.jpg) and [x](/assets/invented.jpg)") + fixer.flush()
+    assert "![Benjamin](/assets/benjamin_milcic_photo.jpg)" in text
+    assert "/assets/invented.jpg" not in text
+    # escaped like JSON by the model
+    assert "](/assets/benjamin_milcic_photo.jpg)" in fixer.feed(r"![B](\/assets/benjamin_milcic_photo.jpg)") + fixer.flush()

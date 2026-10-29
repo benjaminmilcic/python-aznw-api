@@ -46,6 +46,8 @@ class Routes:
         return path in self.exact or any(p.match(path) for p in self.patterns)
 
     def fix(self, target: str) -> str:
+        # The model sometimes escapes slashes like in JSON ("\/assets/...") – the browser can't use that
+        target = target.replace("\\/", "/")
         if SITE_PATTERN.match(target):
             target = SITE_PATTERN.sub("", target) or "/"
         if not target.startswith("/") or target.startswith("//") or self.valid(target):
