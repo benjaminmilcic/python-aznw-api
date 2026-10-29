@@ -97,7 +97,8 @@ def test_invented_links_are_repaired():
     assert ROUTES.fix("/gimmicks/wetter") == "/gimmicks/weather"
     assert ROUTES.fix("/#kontakt") == "/#contact"
     assert ROUTES.fix("/ueber-mich") == "/#about"
-    assert ROUTES.fix("/nonsense") == "/"
+    # nothing fits: no link at all instead of the home page
+    assert ROUTES.fix("/nonsense") == ""
 
 
 def test_link_fixer_handles_links_split_over_tokens():

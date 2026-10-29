@@ -2,7 +2,8 @@
 
 Links to the website are relative paths (/gimmicks/weather, /#contact), so the frontend opens them with the Angular
 router in the same tab. The model sometimes invents paths (/about, /gimmicks/wetter) or translates anchors (/#kontakt),
-which would show the 404 page. LinkFixer corrects the targets of Markdown links directly in the token stream.
+which would show the 404 page. LinkFixer corrects the targets of Markdown links directly in the token stream; a target
+that fits no page becomes empty, and the frontend shows such a link as plain text.
 """
 
 import re
@@ -60,7 +61,8 @@ class Routes:
             for section, synonyms in HOME_SECTIONS.items():
                 if any(s in word for s in synonyms):
                     return f"/#{section}"
-        return "/"
+        # No page fits: an empty target – the chat shows the link text without a link (better than the home page)
+        return ""
 
 
 class LinkFixer:
