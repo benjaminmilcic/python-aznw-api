@@ -30,6 +30,8 @@ def angular_paths(root: Path) -> set[str]:
 
 def route_exists(route: str, segments: set[str]) -> bool:
     path, _, anchor = route.partition("#")
+    # The query only selects something on the page, e.g. /?project=webaro#portfolio opens a project
+    path = path.split("?")[0]
     if path in ("", "/"):
         return not anchor or anchor in HOME_ANCHORS
     return all(part in segments or part.startswith(":") for part in path.strip("/").split("/"))
@@ -63,6 +65,9 @@ async def check(root: Path) -> list[str]:
         for route in filter(None, routes):
             if not route_exists(str(route), segments):
                 errors.append(f"{path}: route '{route}' does not exist in app.routes.ts")
+        if meta.get("category") == "project" and meta.get("route") == "/#portfolio":
+            # Without the id the chat links the portfolio section instead of opening the project
+            errors.append(f"{path}: route of a project must open its dialog: /?project={meta.get('id')}#portfolio")
         if "\n## " not in content.decode("utf-8"):
             errors.append(f"{path}: no '## ' section – nothing would be found in the search")
     for path, ids_ in related.items():

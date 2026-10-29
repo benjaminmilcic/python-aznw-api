@@ -73,3 +73,47 @@ def test_used_up_credit_is_an_error_not_a_limit():
         message="You exceeded your current quota. {'code': 'insufficient_quota'}", llm_provider="openai", model="gpt-5.4-mini"
     )
     assert error_event(err)["code"] == "error"
+
+
+async def test_follow_up_is_searched_with_its_rewritten_query(monkeypatch):
+    searched = []
+
+    async def fake_completion(**kwargs):
+        assert kwargs["reasoning_effort"] == "none"
+        assert "Soll ich dir seinen Werdegang zusammenfassen?" in kwargs["messages"][1]["content"]
+        message = type("M", (), {"content": "Benjamin's career"})()
+        usage = type("U", (), {"prompt_tokens": 200, "completion_tokens": 5, "total_tokens": 205})()
+        return type("R", (), {"choices": [type("C", (), {"message": message})()], "usage": usage})()
+
+    async def fake_search(query, k):
+        searched.append(query)
+        return []
+
+    monkeypatch.setattr(chat.litellm, "acompletion", fake_completion)
+    monkeypatch.setattr(chat.knowledge, "search", fake_search)
+    history = [
+        Message(role="user", content="Stelle mir Benjamin vor"),
+        Message(role="assistant", content="Benjamin ist Entwickler. Soll ich dir seinen Werdegang zusammenfassen?"),
+    ]
+    await chat.retrieve("Ja, bitte", history)
+    assert searched == ["Benjamin's career"]
+
+
+async def test_first_question_and_failed_rewrite_search_without_it(monkeypatch):
+    searched = []
+
+    async def failing_completion(**kwargs):
+        raise RuntimeError("down")
+
+    async def fake_search(query, k):
+        searched.append(query)
+        return []
+
+    monkeypatch.setattr(chat.litellm, "acompletion", failing_completion)
+    monkeypatch.setattr(chat.knowledge, "search", fake_search)
+    assert await chat.search_query("Wer ist Benjamin?", []) is None
+
+    history = [Message(role="user", content="Hallo"), Message(role="assistant", content="Hallo!")]
+    await chat.retrieve("Ja, bitte", history)
+    # the message alone, then together with the conversation
+    assert searched[0] == "Ja, bitte" and "Hallo" in searched[1]
