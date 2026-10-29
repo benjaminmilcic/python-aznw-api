@@ -17,6 +17,9 @@ import yaml
 from pypdf import PdfReader
 
 CV_CHUNK_SIZE = 1200
+# "route: none" – knowledge without a page of its own on the website (architecture, privacy): no link, so the chat
+# doesn't send visitors to the home page for it
+NO_ROUTE = "none"
 # Language code in the CV's file name: benjamin_milcic_cv_en.pdf or benjamin_milcic_cv_en_2027.pdf
 CV_LANGUAGE = re.compile(r"_en(?=[._])")
 CATEGORY_LABELS = {
@@ -72,7 +75,9 @@ def parse_markdown(text: str) -> tuple[Page | None, list[Chunk]]:
         subroutes=[str(s["path"]) for s in as_list(meta.get("subroutes")) if isinstance(s, dict) and s.get("path")],
         source=[str(s) for s in as_list(meta.get("source"))],
     )
-    header = [f"[{page.titles['en']} – {CATEGORY_LABELS.get(page.category, page.category)}]", f"Link: {page.route}"]
+    header = [f"[{page.titles['en']} – {CATEGORY_LABELS.get(page.category, page.category)}]"]
+    if page.route != NO_ROUTE:
+        header.append(f"Link: {page.route}")
     if page.titles["de"] and page.titles["de"] != page.titles["en"]:
         header.append(f"Name on the German website: {page.titles['de']}, Croatian: {page.titles['hr']}")
     if page.source:

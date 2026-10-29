@@ -164,3 +164,9 @@ def test_photo_from_the_knowledge_keeps_its_path(monkeypatch):
     assert "/assets/invented.jpg" not in text
     # escaped like JSON by the model
     assert "](/assets/benjamin_milcic_photo.jpg)" in fixer.feed(r"![B](\/assets/benjamin_milcic_photo.jpg)") + fixer.flush()
+
+
+def test_knowledge_without_a_page_gets_no_link():
+    page, chunks = parse_markdown(PAGE.replace("route: /gimmicks/weather", "route: none"))
+    assert page.route == "none"
+    assert "Link:" not in chunks[0].text

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 
-from app.rag.documents import FRONTMATTER, load_documents
+from app.rag.documents import FRONTMATTER, NO_ROUTE, load_documents
 from app.rag.sources import LocalSource
 
 REQUIRED = ("id", "title_de", "title_en", "title_hr", "route", "category", "summary")
@@ -29,6 +29,8 @@ def angular_paths(root: Path) -> set[str]:
 
 
 def route_exists(route: str, segments: set[str]) -> bool:
+    if route == NO_ROUTE:  # knowledge without a page of its own
+        return True
     path, _, anchor = route.partition("#")
     # The query only selects something on the page, e.g. /?project=webaro#portfolio opens a project
     path = path.split("?")[0]

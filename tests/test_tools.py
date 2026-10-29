@@ -106,7 +106,13 @@ async def test_weather_at_shared_location():
     respx.get("https://api.open-meteo.com/v1/forecast").respond(
         json={
             "current": {"temperature_2m": 18.2, "apparent_temperature": 17.0, "weather_code": 2, "wind_speed_10m": 9.0, "relative_humidity_2m": 60},
-            "daily": {"temperature_2m_min": [12.0], "temperature_2m_max": [21.0], "precipitation_probability_max": [10]},
+            "daily": {
+                "time": ["2026-10-29", "2026-10-30"],
+                "weather_code": [2, 61],
+                "temperature_2m_min": [12.0, 10.5],
+                "temperature_2m_max": [21.0, 16.0],
+                "precipitation_probability_max": [10, 80],
+            },
         }
     )
     respx.get(f"{NEST_API_URL}/geolocation/reverse-geocode").respond(
@@ -115,6 +121,10 @@ async def test_weather_at_shared_location():
     result = await call("get_weather", {}, ToolContext(latitude=45.33, longitude=14.44))
     assert result["place"] == "Rijeka, Hrvatska"
     assert result["current"]["conditions"] == "partly cloudy"
+    assert result["today"] == {"conditions": "partly cloudy", "min_c": 12.0, "max_c": 21.0, "precipitation_probability_percent": 10}
+    assert result["next_days"] == [
+        {"conditions": "light rain", "min_c": 10.5, "max_c": 16.0, "precipitation_probability_percent": 80, "date": "2026-10-30", "weekday": "Friday"}
+    ]
 
 
 @respx.mock

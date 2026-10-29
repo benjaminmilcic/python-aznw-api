@@ -20,6 +20,7 @@ from app.config import (
     REASONING_EFFORT,
 )
 from app.links import LinkFixer, Routes
+from app.rag.documents import NO_ROUTE
 from app.rag.index import knowledge
 from app.tools import TOOLS, ToolContext, run_tool
 
@@ -49,7 +50,8 @@ Rules:
   it, not even partially. Say politely that you only answer questions about Benjamin Milčić and his website, and
   suggest one or two questions you can answer.
 - You may say which country Benjamin lives in, but never give out a home address.
-- Whenever you mention contacting Benjamin – and whenever a question goes beyond what you know – name both ways:
+- Whenever you mention contacting Benjamin – and whenever a question about Benjamin or his work goes beyond what you
+  know – name both ways (not for questions to a tool like the weather or recipes):
   his email ({CONTACT_EMAIL}) and the contact form as a Markdown link to {CONTACT_FORM}. Write the link text in the
   language of the answer (German "Kontaktformular", Croatian "kontakt obrazac", ...).
 - Links to the website are relative paths, exactly as given in the knowledge ("Link: ...") or by the tools, e.g.
@@ -69,6 +71,7 @@ Rules:
 - Short greetings, thanks and questions about what you can do are fine: introduce yourself briefly.
 - End an answer with a short offer of ONE concrete topic you can tell more about and that continues the current one,
   e.g. "Should I tell you more about his career?" – never a choice of several topics, and never an unrelated page.
+  Only offer what the knowledge or a tool really provides and what is not in your answer yet.
 - If the visitor just agrees to your previous offer ("yes", "ja, bitte"), give exactly what you offered, all of it.
 - Never repeat an earlier answer of the conversation, not even in other words. If there is nothing new on a topic,
   say so in one sentence and offer a different topic.
@@ -89,9 +92,12 @@ Tools:
   comments, opinions or reviews of Benjamin) also ask first whether you should show guestbook entries. If the visitor
   agrees, first show only a list of the authors' names with dates. Show the full text of an entry
   (get_guestbook_entry) only when the visitor asks for it, quote it faithfully and show its images.
-- Weather: for the current weather call get_weather. Without a named city it uses the visitor's shared location. If
+- Weather: for the weather call get_weather – it returns the current weather, today and the next three days. Without
+  a named city it uses the visitor's shared location. If
   the location is missing, ask the visitor to share their location (a button appears below your answer) or to name
-  a city. Never mention street names or exact addresses.
+  a city. Never mention street names or exact addresses. Write days as weekday and date in the visitor's language
+  (e.g. "Freitag, 30.10."), not as 2026-10-30. Show the current weather and today first and offer the forecast for
+  the next three days; if the visitor agrees, show only the next days.
 - Moorhuhn: for the Moorhuhn high score call get_moorhuhn_highscores and show the list as a table."""
 
 # Small models tend to keep the language of the earlier conversation, so this is repeated right before the question
@@ -120,6 +126,11 @@ FACT_REMINDER = (
 CONTACT_REMINDER = (
     f"Whenever your answer mentions Benjamin's email or contacting him, also mention the contact form as a Markdown "
     f"link to {CONTACT_FORM}, with the link text in the language of the answer."
+)
+# Repeated right before the question as well – in the long prompt alone the model repeated whole answers on "yes"
+REPEAT_REMINDER = (
+    "Do not repeat anything you already said in this conversation, not even tool results. If the message agrees to "
+    "your last offer, answer with only the offered content."
 )
 CONTACT_FORM_NOTE = f"You can also write to Benjamin via the [contact form]({CONTACT_FORM}) on his website."
 
@@ -201,6 +212,8 @@ def site_routes() -> Routes:
     routes = ["/", "/chat", *knowledge.cv_links.values(), *assets]
     names = {}
     for page in knowledge.pages:
+        if page.route == NO_ROUTE:
+            continue
         routes += [page.route, *page.subroutes]
         names[page.id] = page.route
         for title in page.titles.values():
@@ -214,7 +227,8 @@ def site_map() -> str:
     groups: dict[str, list[str]] = {}
     for page in knowledge.pages:
         names = dict.fromkeys(t for t in (page.titles["en"], page.titles["de"], page.titles["hr"]) if t)
-        groups.setdefault(page.category, []).append(f"{' / '.join(names)} ({page.route})")
+        link = "no page of its own, don't link it" if page.route == NO_ROUTE else page.route
+        groups.setdefault(page.category, []).append(f"{' / '.join(names)} ({link})")
     labels = {"page": "Pages", "person": "About Benjamin", "project": "Portfolio projects", "gimmick": "Gimmicks", "game": "Games"}
     return "\n".join(f"{labels.get(c, c)}: " + "; ".join(items) for c, items in groups.items())
 
@@ -293,7 +307,7 @@ def cv_rule(website_language: str | None) -> str:
 def build_messages(
     message: str, history: list[Message], knowledge_text: str, website_language: str | None = None
 ) -> list[dict]:
-    reminders = f"{language_reminder(website_language)}\n\n{FACT_REMINDER}\n\n{CONTACT_REMINDER}"
+    reminders = f"{language_reminder(website_language)}\n\n{FACT_REMINDER}\n\n{CONTACT_REMINDER}\n\n{REPEAT_REMINDER}"
     return [
         {
             "role": "system",

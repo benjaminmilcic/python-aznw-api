@@ -1,5 +1,7 @@
 """Current weather at the visitor's location or in a named place (Open-Meteo, free and without a key)."""
 
+from datetime import date
+
 import httpx
 
 from app import nest
@@ -9,7 +11,8 @@ SCHEMA = {
     "function": {
         "name": "get_weather",
         "description": (
-            "Returns the current weather and today's forecast. Without a city it uses the visitor's location, "
+            "Returns the current weather, today's forecast and the forecast for the next three days. Without a "
+            "city it uses the visitor's location, "
             "if they shared it. If the result says the location is missing, ask the visitor to share their "
             "location or to name a city."
         ),
@@ -26,6 +29,7 @@ SCHEMA = {
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 TIMEOUT = httpx.Timeout(15.0)
+FORECAST_DAYS = 4
 
 # WMO weather codes as used by Open-Meteo
 WEATHER_CODES = {
@@ -48,6 +52,22 @@ async def find_city(client: httpx.AsyncClient, city: str) -> dict | None:
         return None
     r = results[0]
     return {"latitude": r["latitude"], "longitude": r["longitude"], "place": f"{r['name']}, {r.get('country', '')}".strip(", ")}
+
+
+def day(daily: dict, i: int) -> dict:
+    """The forecast of one day from Open-Meteo's daily arrays."""
+    codes = daily.get("weather_code") or []
+    return {
+        "conditions": WEATHER_CODES.get(codes[i], "unknown") if i < len(codes) else "unknown",
+        "min_c": daily["temperature_2m_min"][i],
+        "max_c": daily["temperature_2m_max"][i],
+        "precipitation_probability_percent": daily["precipitation_probability_max"][i],
+    }
+
+
+def dated(iso_date: str) -> dict:
+    """Date and weekday – the model gets weekdays wrong when it has to work them out itself."""
+    return {"date": iso_date, "weekday": date.fromisoformat(iso_date).strftime("%A")}
 
 
 async def place_name(latitude: float, longitude: float) -> str | None:
@@ -81,8 +101,9 @@ async def run(args: dict, context) -> dict:
                 "latitude": location["latitude"],
                 "longitude": location["longitude"],
                 "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m",
-                "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
-                "forecast_days": 1,
+                "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+                # Today and the next three days – so "and the next days?" can be answered as well
+                "forecast_days": FORECAST_DAYS,
                 "timezone": "auto",
             },
         )
@@ -100,10 +121,7 @@ async def run(args: dict, context) -> dict:
             "wind_kmh": current["wind_speed_10m"],
             "humidity_percent": current["relative_humidity_2m"],
         },
-        "today": {
-            "min_c": daily["temperature_2m_min"][0],
-            "max_c": daily["temperature_2m_max"][0],
-            "precipitation_probability_percent": daily["precipitation_probability_max"][0],
-        },
+        "today": day(daily, 0),
+        "next_days": [day(daily, i) | dated(daily["time"][i]) for i in range(1, len(daily.get("time", [])))],
         "weather_gimmick_link": "/gimmicks/weather",
     }
