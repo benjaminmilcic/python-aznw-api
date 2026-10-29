@@ -124,12 +124,13 @@ def portfolio_chunks(projects: list[dict], texts: dict) -> list[Chunk]:
                 lines.append(description)
                 # The description names the client (e.g. Codext GmbH), so questions about employers find it too
                 overview_line += f" {description}"
-            elif block["type"] == "section":
-                lines.append(translate(texts, block["titleKey"]))
-                for link in block["links"]:
-                    label = link.get("label") or translate(texts, link.get("labelKey", ""))
-                    if "{lang}" not in link["href"]:
-                        lines.append(f"{label}: {link['href']}")
+            elif block["type"] in ("section", "links"):
+                if block["type"] == "section":
+                    lines.append(translate(texts, block["titleKey"]))
+                for button in block["links"]:
+                    label = button.get("label") or translate(texts, button.get("labelKey", ""))
+                    if "{lang}" not in button["href"]:
+                        lines.append(f"{label}: {button['href']}")
             elif block["type"] == "storeBadge":
                 lines.append(f"Google Play Store: {block['href']}")
         chunks.append(Chunk("\n".join(lines), f"Portfolio: {title}", link))

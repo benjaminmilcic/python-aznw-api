@@ -138,3 +138,14 @@ async def test_files_without_any_page_are_reported_instead_of_a_silent_empty_ind
         await index.refresh()
     # Not stored, so the next check reads the files again
     assert index.versions == {}
+
+
+def test_link_buttons_without_an_image_are_in_the_project_chunk():
+    projects = [
+        {"id": "solakon", "title": "Solakon", "descKey": "p.desc", "stack": ["Ionic"], "dialog": [
+            {"type": "links", "links": [{"href": "https://app.solakon.de/", "labelKey": "p.webApp"}]},
+        ]},
+    ]
+    chunk = portfolio_chunks(projects, {"p": {"desc": "Solar app", "webApp": "Open web app"}})[0]
+    assert "Open web app: https://app.solakon.de/" in chunk.text
+    assert chunk.route == "/?project=solakon#portfolio"
