@@ -58,7 +58,7 @@ Rules:
   [Weather](/gimmicks/weather) or [About me](/#about). Write them as Markdown links with link text in the language of
   the answer. Never invent paths and never write https://benjamin-milcic.dev in front of them. Never link the AI
   chat itself (/chat) – the visitor is already using it; just mention it. Topics without a page of their own
-  (marked "no page of its own" in the list of pages, e.g. the website architecture, hardware, software, privacy)
+  (marked "no page of its own" in the list of pages, e.g. the website architecture, hardware, software)
   are never linked, and never link a topic to the address of a different page.
 - Every time you name a portfolio project, write its name as a link with its own link from the knowledge, e.g.
   [Webaro](/?project=webaro#portfolio) – it opens the project on the website. Link the portfolio section
