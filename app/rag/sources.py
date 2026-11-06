@@ -35,6 +35,8 @@ def newest_cv(paths: list[str]) -> list[str]:
 
 
 class LocalSource:
+    commit = None  # only the GitHub source has commits
+
     def __init__(self, root: str) -> None:
         self.root = Path(root).resolve()
 

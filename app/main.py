@@ -88,6 +88,7 @@ async def health() -> dict:
         "model": LLM_MODEL,
         "nestApi": NEST_API_URL,
         "knowledgeSource": KNOWLEDGE_SOURCE,
+        "knowledgeCommit": knowledge.commit,
         "knowledgePages": len(knowledge.pages),
         "knowledgeChunks": len(knowledge.chunks),
         "knowledgeError": knowledge.error,

@@ -56,6 +56,8 @@ class KnowledgeIndex:
         self.files: dict[str, bytes] = {}
         self.cache: dict[str, list[float]] = self.load_cache()
         self.error: str | None = None
+        # The commit the index is known to match, for /health; None until the first successful check
+        self.commit: str | None = None
 
     @staticmethod
     def load_cache() -> dict[str, list[float]]:
@@ -77,6 +79,7 @@ class KnowledgeIndex:
         """Reloads changed files and embeds new chunks. Returns True if something changed."""
         versions = await self.source.list_files()
         if versions == self.versions:
+            self.commit = self.source.commit
             return False
         changed = [p for p, v in versions.items() if self.versions.get(p) != v]
         contents = await asyncio.gather(*(self.source.read(p) for p in changed))
@@ -96,6 +99,7 @@ class KnowledgeIndex:
         self.files, self.versions = files, versions
         self.pages, self.chunks = pages, chunks
         self.vectors = [self.cache[c.key] for c in chunks]
+        self.commit = self.source.commit
         logger.info("Knowledge base %s: %d pages, %d chunks (%d embedded)", self.source.describe(), len(pages), len(chunks), len(missing))
         return True
 

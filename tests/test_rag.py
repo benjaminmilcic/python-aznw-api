@@ -171,3 +171,47 @@ def test_knowledge_without_a_page_gets_no_link():
     page, chunks = parse_markdown(PAGE.replace("route: /gimmicks/weather", "route: none"))
     assert page.route == "none"
     assert "Link:" not in chunks[0].text
+
+
+async def test_health_commit_follows_the_last_successful_check(monkeypatch):
+    import pytest
+
+    from app.rag.index import KnowledgeIndex
+
+    class Repo:
+        commit = "aaa"
+        version = "v1"
+        content = b"---\nid: a\ntitle_en: A\nroute: /\n---\n# A\n\n## What is A?\nText.\n"
+
+        def describe(self):
+            return "github:test@new"
+
+        async def list_files(self):
+            return {"ai-chat-knowledge-base/a.md": self.version}
+
+        async def read(self, path):
+            return self.content
+
+    async def no_embeddings(texts):
+        return [[1.0] for _ in texts]
+
+    monkeypatch.setattr("app.rag.index.embed", no_embeddings)
+    monkeypatch.setattr(KnowledgeIndex, "save_cache", lambda self, keys: None)
+    index = KnowledgeIndex("../aznw-routes")
+    index.cache = {}
+    index.source = Repo()
+    assert index.commit is None
+
+    await index.refresh()
+    assert index.commit == "aaa"
+
+    # A newer commit without changes to the knowledge: the index still matches it
+    index.source.commit = "bbb"
+    await index.refresh()
+    assert index.commit == "bbb"
+
+    # A failed reload keeps the old commit, so a stale index cannot look up to date
+    index.source.commit, index.source.version, index.source.content = "ccc", "v2", b"# no frontmatter"
+    with pytest.raises(ValueError):
+        await index.refresh()
+    assert index.commit == "bbb"
